@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System;
 using ConfidentialityDocSearcher.Service;
 using ConfidentialityDocSearcher.Infrastructure.Commands.Base;
+using ConfidentialityDocSearcher.Infrastructure.Helpers;
 
 namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
 {
@@ -88,7 +89,7 @@ namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
         public ICommand SearchCommand { get; }
         private async void OnSearchCommandExecuted(object p)
         {
-            _log.Debug("Команда поиска Word-документов");
+            _log.Debug("Команда поиска конфиденциальных документов");
             var searcher = new ConfidentialSearcher();
             var progress = new Progress<double>(p => ProgressValue = p);
             var status = new Progress<string>(s => StatusText = s);
@@ -103,12 +104,7 @@ namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
             ((Command)SearchCommand).Executable = true;
             ((Command)SaveCommand).Executable = true;
 
-            SearchResults.Clear();
-            foreach (var file in _confidentialFiles)
-            {
-                SearchResults.Add(file);
-            }
-            //OnPropertyChanged(nameof(SearchResults));
+            SearchResults.AddClear(_confidentialFiles);
             _log.Debug("Поиск завершен");
         }
 
@@ -154,33 +150,25 @@ namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
         
         public ObservableCollection<string> SearchResults { get; set; }
 
-        #region Window title
-
-        private string _title;
         /// <summary>
         /// Заголовок окна
         /// </summary>
-        public string Title { get => _title; set => Set(ref _title, value); }
-        #endregion
+        public string Title { get => Get<string>(); set => Set<string>(value); }
+        
+        /// <summary>
+        /// Директроия поиска
+        /// </summary>
+        public string SearchPath { get => Get<string>(); set => Set<string>(value); }
 
-        #region SearchPath
+        /// <summary>
+        /// Статус выполнения
+        /// </summary>
+        public string StatusText { get => Get<string>(); set => Set<string>(value); }
 
-        private string _searchPath;
-        public string SearchPath { get => _searchPath; set => Set(ref _searchPath, value); }
-        #endregion
-
-        #region StatusText
-
-        private string _statusText;
-        public string StatusText { get => _statusText; set => Set(ref _statusText, value); }
-        #endregion
-
-        #region ProgressValue
-
-        private double _progressValue;
-        public double ProgressValue { get => _progressValue; set => Set(ref _progressValue, value); }
-        #endregion
-
+        /// <summary>
+        /// Прогресс выполнения
+        /// </summary>
+        public double ProgressValue { get => Get<double>(); set => Set<double>(value); }
 
         /* ------------------------------------------------------------------------------------------------------------ */
 
