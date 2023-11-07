@@ -1,5 +1,4 @@
-﻿using DocumentFormat.OpenXml.Drawing.Charts;
-using DocumentFormat.OpenXml.Packaging;
+﻿using DocumentFormat.OpenXml.Packaging;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -22,6 +21,7 @@ internal class ConfidentialSearcher
         var result = new List<string>();
         await Task.Run(() =>
         {
+            #region поиск word-файлов
             status?.Report("поиск docx-файлов");
             var files = Directory.EnumerateFiles(dir, "*.docx", SearchOption.AllDirectories);
             
@@ -80,6 +80,154 @@ internal class ConfidentialSearcher
                 Thread.Sleep(50);
                 progress?.Report(_percent);
             }
+            #endregion
+
+            #region поиск xlsx-файлов
+            status?.Report("поиск xlsx-файлов");
+            files = Directory.EnumerateFiles(dir, "*.xlsx", SearchOption.AllDirectories);
+            _percent = 0.0;
+            _deltaPercent = 0.1;
+            _fileCount = 0;
+
+            Task.Run(() =>
+            {
+                Thread.CurrentThread.Priority = ThreadPriority.Highest;
+                DeltaPercentCalculate(files);
+            });
+            foreach (var file in files)
+            {
+                _log.Debug($"Анализ файла {file}");
+                _fileCount++;
+                _percent += _deltaPercent;
+                progress?.Report(_percent);
+                _log.Trace($"Прогресс {_percent}, дельта {_deltaPercent}");
+                if (file is null)
+                {
+                    _log.Error($"Файл {file} не существует");
+                    continue;
+                }
+                var fileName = Path.GetFileName(file);
+                if (fileName.StartsWith("~"))
+                {
+                    _log.Warn($"Файл {file} является временным файлом и будет игнорирован");
+                    continue;
+                }
+                try
+                {
+                    var confconfidentialityFlag = false;
+                    using (var doc = SpreadsheetDocument.Open(file, false))
+                    {
+                        foreach (var part in doc.GetAllParts())
+                        {
+                            using (StreamReader reader = new StreamReader(part.GetStream()))
+                            {
+                                var documentText = reader.ReadToEnd();
+                                if (documentText.Contains("confidentialityType"))
+                                {
+                                    _log.Warn($"Файл {file} содержит конфиденциальную информацию");
+                                    result.Add(file);
+                                    confconfidentialityFlag = true;
+                                    break;
+                                }
+                                    
+                                
+                            }
+                        }
+
+                        if(!confconfidentialityFlag)
+                        {
+                            _log.Debug($"Файл {file} не содержит конфиденциальную информацию");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex.Message);
+                    continue;
+                }
+            }
+            while (_percent < 100.0)
+            {
+                _percent += _deltaPercent;
+                Thread.Sleep(50);
+                progress?.Report(_percent);
+            }
+            #endregion
+
+            #region поиск pdf-файлов
+            status?.Report("поиск pdf-файлов");
+            files = Directory.EnumerateFiles(dir, "*.pdf", SearchOption.AllDirectories);
+            _percent = 0.0;
+            _deltaPercent = 0.1;
+            _fileCount = 0;
+
+            Task.Run(() =>
+            {
+                Thread.CurrentThread.Priority = ThreadPriority.Highest;
+                DeltaPercentCalculate(files);
+            });
+
+            foreach (var file in files)
+            {
+                _log.Debug($"Анализ файла {file}");
+                _fileCount++;
+                _percent += _deltaPercent;
+                progress?.Report(_percent);
+                _log.Trace($"Прогресс {_percent}, дельта {_deltaPercent}");
+                if (file is null)
+                {
+                    _log.Error($"Файл {file} не существует");
+                    continue;
+                }
+                var fileName = Path.GetFileName(file);
+                if (fileName.StartsWith("~"))
+                {
+                    _log.Warn($"Файл {file} является временным файлом и будет игнорирован");
+                    continue;
+                }
+
+                try
+                {
+                    var confconfidentialityFlag = false;
+                    using (var doc = SpreadsheetDocument.Open(file, false))
+                    {
+                        foreach (var part in doc.GetAllParts())
+                        {
+                            using (StreamReader reader = new StreamReader(part.GetStream()))
+                            {
+                                var documentText = reader.ReadToEnd();
+                                if (documentText.Contains("confidentialityType"))
+                                {
+                                    _log.Warn($"Файл {file} содержит конфиденциальную информацию");
+                                    result.Add(file);
+                                    confconfidentialityFlag = true;
+                                    break;
+                                }
+
+
+                            }
+                        }
+
+                        if (!confconfidentialityFlag)
+                        {
+                            _log.Debug($"Файл {file} не содержит конфиденциальную информацию");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex.Message);
+                    continue;
+                }
+            }
+            while (_percent < 100.0)
+            {
+                _percent += _deltaPercent;
+                Thread.Sleep(50);
+                progress?.Report(_percent);
+            }
+            #endregion
+
             status?.Report("поиск завершен");
         });
         return result;
