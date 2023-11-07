@@ -108,7 +108,7 @@ namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
             {
                 SearchResults.Add(file);
             }
-            OnPropertyChanged(nameof(SearchResults));
+            //OnPropertyChanged(nameof(SearchResults));
             _log.Debug("Поиск завершен");
         }
 
