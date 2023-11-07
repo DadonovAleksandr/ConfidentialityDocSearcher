@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net7.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+	<StartupObject>ConfidentialityDocSearcher.Program</StartupObject>
+	<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Infrastructure\Convertors\" />
+    <Folder Include="Infrastructure\Resources\Images\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Config.Net" Version="5.1.5" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="2.20.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
+    <PackageReference Include="NLog" Version="5.2.4" />
+    <PackageReference Include="NLog.Extensions.Logging" Version="5.3.4" />
+    <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
+    <PackageReference Include="ProjectVersionInfoLib" Version="1.2.0" />
+    <PackageReference Include="ProjectWPF.Styles" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="nlog.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

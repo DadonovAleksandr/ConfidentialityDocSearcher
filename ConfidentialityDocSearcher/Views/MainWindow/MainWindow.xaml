@@ -1,0 +1,52 @@
+﻿<Window x:Class="ConfidentialityDocSearcher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ConfidentialityDocSearcher"
+        mc:Ignorable="d"
+        DataContext="{Binding MainWindowViewModel, Source={StaticResource Locator}}"
+        Title="{Binding Title}" Height="450" Width="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <GroupBox Grid.Row="0" Header="Директория поиска" Margin="5">
+            <DockPanel Margin="5">
+                <Button Content="Обзор" Command="{Binding Path=BrowseCommand}" 
+                        DockPanel.Dock="Right" Padding="5" MinWidth="80"/>
+                <TextBox Text="{Binding Path=SearchPath, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                         IsReadOnly="True" Margin="0,0,10,0" />
+            </DockPanel>
+        </GroupBox>
+        <DockPanel Grid.Row="1" Margin="5">
+            <Button Content="Поиск" Command="{Binding Path=SearchCommand}" Padding="5" Width="100"/>
+        </DockPanel>
+        <GroupBox Grid.Row="2" Header="Результат поиска" Margin="5">
+            <DockPanel Margin="5">
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                    <Button Content="Сохранить" Command="{Binding SaveCommand}"
+                            Padding="5" MinWidth="80"
+                            HorizontalAlignment="Right"/>
+                </StackPanel>
+                <ListBox ItemsSource="{Binding Path=SearchResults}">
+                </ListBox>
+            </DockPanel>
+        </GroupBox>
+        <StatusBar Grid.Row="3">
+            <StatusBarItem HorizontalContentAlignment="Left">
+                <TextBlock Text="{Binding Path=StatusText, Mode=OneWay, UpdateSourceTrigger=PropertyChanged, StringFormat=Статус: {0}}"
+                           Margin="5,0"/>
+            </StatusBarItem>
+            <StatusBarItem HorizontalContentAlignment="Stretch">
+                <ProgressBar Value="{Binding Path=ProgressValue, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                     MinWidth="100" Height="20" Margin="10,0,5,0"/>    
+            </StatusBarItem>
+            
+        </StatusBar>
+    </Grid>
+</Window>
