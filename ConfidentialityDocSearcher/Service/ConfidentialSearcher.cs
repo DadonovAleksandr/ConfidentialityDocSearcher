@@ -1,5 +1,4 @@
 ﻿using DocumentFormat.OpenXml.Packaging;
-using DocumentFormat.OpenXml.Presentation;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -14,22 +13,37 @@ internal class ConfidentialSearcher
 {
     private static Logger _log = LogManager.GetCurrentClassLogger();
     private List<string> _files = new List<string>();
+    private List<string> _result = new List<string>();
     private double _deltaPercent = 0.1;
     private double _percent = 0.0;
     private double _lastPercent = 0.0;
     private int _fileCount = 0;
-    public async Task<List<string>> SearchAsync(string dir, IProgress<double> progress = null, IProgress<string> status = null)
+    public async Task<List<string>> SearchAsync(string dir, IProgress<double> progress = null, IProgress<string> status = null, 
+        CancellationToken cancellation = default)
     {
-        var result = new List<string>();
-        _log.Debug("Поиск docx-файлов");
-        result.AddRange(await Task.Run(() => SearchWordFiles(dir, progress, status)));
-        _log.Debug("Поиск xlsx-файлов");
-        result.AddRange(await Task.Run(() => SearchExcelFiles(dir, progress, status)));
-        _log.Debug("Поиск pdf-файлов");
-        result.AddRange(await Task.Run(() => SearchPdfFiles(dir, progress, status)));
-        
-        status?.Report("поиск завершен");
-        return result;
+        try
+        {
+            _log.Debug("Поиск docx-файлов");
+            await Task.Run(() => SearchWordFiles(dir, progress, status, cancellation));
+            _log.Debug("Поиск xlsx-файлов");
+            await Task.Run(() => SearchExcelFiles(dir, progress, status, cancellation));
+            _log.Debug("Поиск pdf-файлов");
+            await Task.Run(() => SearchPdfFiles(dir, progress, status, cancellation));
+            
+            status?.Report("поиск завершен");
+            return _result;
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellation)
+        {
+            _log.Warn("Поиск отменен");
+            status?.Report("поиск отменен");
+            return _result;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex.Message);
+            return new List<string>();
+        }
     }
 
     public IEnumerable<string> Search(string dir)
@@ -87,40 +101,42 @@ internal class ConfidentialSearcher
         return _files;
     }
 
-    private string[] SearchWordFiles(string dir, IProgress<double> progress = null, IProgress<string> status = null)
+    private void SearchWordFiles(string dir, IProgress<double> progress = null, IProgress<string> status = null,
+        CancellationToken cancellation = default)
     {
-        var result = new List<string>();
-        status?.Report("поиск docx-файлов");
-        InitProgress();
-
-        var files = Directory.EnumerateFiles(dir, "*.docx", SearchOption.AllDirectories);
-
-        Task.Run(() =>
+        try
         {
-            Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            DeltaPercentCalculate(files);
-        });
-        _fileCount = 0;
-        foreach (var file in files)
-        {
-            _log.Debug($"Анализ файла {file}");
-            _fileCount++;
-            _percent += _deltaPercent;
-            ReportProgress(progress);
-            _log.Trace($"Прогресс {_percent}, дельта {_deltaPercent}");
-            if (file is null)
+            status?.Report("поиск docx-файлов");
+            InitProgress();
+
+            var files = Directory.EnumerateFiles(dir, "*.docx", SearchOption.AllDirectories);
+
+            Task.Run(() => { DeltaPercentCalculate(files); });
+            _fileCount = 0;
+            foreach (var file in files)
             {
-                _log.Error($"Файл {file} не существует");
-                continue;
-            }
-            var fileName = Path.GetFileName(file);
-            if (fileName.StartsWith("~"))
-            {
-                _log.Warn($"Файл {file} является временным файлом и будет игнорирован");
-                continue;
-            }
-            try
-            {
+                if(cancellation.IsCancellationRequested)
+                {
+                    _log.Warn("Поиск docx-файлов отменен");
+                    cancellation.ThrowIfCancellationRequested();
+                }
+                _log.Trace($"Анализ файла {file}");
+                _fileCount++;
+                _percent += _deltaPercent;
+                ReportProgress(progress);
+                _log.Trace($"Прогресс {_percent}, дельта {_deltaPercent}");
+                if (file is null)
+                {
+                    _log.Error($"Файл {file} не существует");
+                    continue;
+                }
+                var fileName = Path.GetFileName(file);
+                if (fileName.StartsWith("~"))
+                {
+                    _log.Warn($"Файл {file} является временным файлом и будет игнорирован");
+                    continue;
+                }
+
                 using (var doc = WordprocessingDocument.Open(file, false))
                 {
                     using (StreamReader reader = new StreamReader(doc.MainDocumentPart.GetStream()))
@@ -128,59 +144,62 @@ internal class ConfidentialSearcher
                         var documentText = reader.ReadToEnd();
                         if (documentText.Contains("confidentialityType"))
                         {
-                            _log.Warn($"Файл {file} содержит конфиденциальную информацию");
-                            result.Add(file);
+                            _log.Debug($"Файл {file} содержит конфиденциальную информацию");
+                            _result.Add(file);
                         }
                         else
                         {
-                            _log.Debug($"Файл {file} не содержит конфиденциальную информацию");
+                            _log.Trace($"Файл {file} не содержит конфиденциальную информацию");
                         }
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                _log.Error(ex.Message);
-                continue;
-            }
+            CompleteProgress(progress);
         }
-        CompleteProgress(progress);
-        
-        return result.ToArray();
+        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellation) 
+        {
+            _log.Warn(ex.Message);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex.Message);
+        }
     }
 
-    private string[] SearchExcelFiles(string dir, IProgress<double> progress = null, IProgress<string> status = null)
+    private void SearchExcelFiles(string dir, IProgress<double> progress = null, IProgress<string> status = null,
+        CancellationToken cancellation = default)
     {
-        var result = new List<string>();
-        status?.Report("поиск xlsx-файлов");
-        var files = Directory.EnumerateFiles(dir, "*.xlsx", SearchOption.AllDirectories);
-        InitProgress();
+        try
+        {
+            status?.Report("поиск xlsx-файлов");
+            var files = Directory.EnumerateFiles(dir, "*.xlsx", SearchOption.AllDirectories);
+            InitProgress();
 
-        Task.Run(() =>
-        {
-            Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            DeltaPercentCalculate(files);
-        });
-        foreach (var file in files)
-        {
-            _log.Debug($"Анализ файла {file}");
-            _fileCount++;
-            _percent += _deltaPercent;
-            ReportProgress(progress);
-            _log.Trace($"Прогресс {_percent}, дельта {_deltaPercent}");
-            if (file is null)
+            Task.Run(() => { DeltaPercentCalculate(files); });
+            foreach (var file in files)
             {
-                _log.Error($"Файл {file} не существует");
-                continue;
-            }
-            var fileName = Path.GetFileName(file);
-            if (fileName.StartsWith("~"))
-            {
-                _log.Warn($"Файл {file} является временным файлом и будет игнорирован");
-                continue;
-            }
-            try
-            {
+                if(cancellation.IsCancellationRequested)
+                {
+                    _log.Warn("Поиск xlsx-файлов отменен");
+                    cancellation.ThrowIfCancellationRequested();
+                }
+                _log.Trace($"Анализ файла {file}");
+                _fileCount++;
+                _percent += _deltaPercent;
+                ReportProgress(progress);
+                _log.Trace($"Прогресс {_percent}, дельта {_deltaPercent}");
+                if (file is null)
+                {
+                    _log.Error($"Файл {file} не существует");
+                    continue;
+                }
+                var fileName = Path.GetFileName(file);
+                if (fileName.StartsWith("~"))
+                {
+                    _log.Warn($"Файл {file} является временным файлом и будет игнорирован");
+                    continue;
+                }
                 var confconfidentialityFlag = false;
                 using (var doc = SpreadsheetDocument.Open(file, false))
                 {
@@ -191,8 +210,8 @@ internal class ConfidentialSearcher
                             var documentText = reader.ReadToEnd();
                             if (documentText.Contains("confidentialityType"))
                             {
-                                _log.Warn($"Файл {file} содержит конфиденциальную информацию");
-                                result.Add(file);
+                                _log.Debug($"Файл {file} содержит конфиденциальную информацию");
+                                _result.Add(file);
                                 confconfidentialityFlag = true;
                                 break;
                             }
@@ -201,69 +220,82 @@ internal class ConfidentialSearcher
 
                     if (!confconfidentialityFlag)
                     {
-                        _log.Debug($"Файл {file} не содержит конфиденциальную информацию");
+                        _log.Trace($"Файл {file} не содержит конфиденциальную информацию");
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                _log.Error(ex.Message);
-                continue;
-            }
+            CompleteProgress(progress);
         }
-        CompleteProgress(progress);
-
-        return result.ToArray();
+        catch(OperationCanceledException ex) when (ex.CancellationToken == cancellation) 
+        {
+            _log.Warn(ex.Message);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex.Message);
+        }
     }
 
-    private string[] SearchPdfFiles(string dir, IProgress<double> progress = null, IProgress<string> status = null)
+    private void SearchPdfFiles(string dir, IProgress<double> progress = null, IProgress<string> status = null,
+        CancellationToken cancellation = default)
     {
-        var result = new List<string>();
-        status?.Report("поиск pdf-файлов");
-        var files = Directory.EnumerateFiles(dir, "*.pdf", SearchOption.AllDirectories);
-        InitProgress();
-
-        Task.Run(() =>
+        try
         {
-            Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            DeltaPercentCalculate(files);
-        });
-        var searchedNames = result.Select(r => Path.GetFileNameWithoutExtension(r));
-        foreach (var file in files)
-        {
-            _log.Debug($"Анализ файла {file}");
-            _fileCount++;
-            _percent += _deltaPercent;
-            ReportProgress(progress);
-            _log.Trace($"Прогресс {_percent}, дельта {_deltaPercent}");
-            if (file is null)
-            {
-                _log.Error($"Файл {file} не существует");
-                continue;
-            }
-            var fileName = Path.GetFileName(file);
-            if (fileName.StartsWith("~"))
-            {
-                _log.Warn($"Файл {file} является временным файлом и будет игнорирован");
-                continue;
-            }
+            status?.Report("поиск pdf-файлов");
+            var files = Directory.EnumerateFiles(dir, "*.pdf", SearchOption.AllDirectories);
+            InitProgress();
 
-            var name = Path.GetFileNameWithoutExtension(file);
-            if (searchedNames.Contains(name))
+            Task.Run(() => { DeltaPercentCalculate(files); });
+            var searchedNames = _result.Select(r => Path.GetFileNameWithoutExtension(r));
+            foreach (var file in files)
             {
-                _log.Warn($"Файл {file} содержит конфиденциальную информацию");
-                result.Add(file);
-                continue;
-            }
-            else
-            {
-                _log.Debug($"Файл {file} не содержит конфиденциальную информацию");
-            }
+                if(cancellation.IsCancellationRequested)
+                {
+                    _log.Warn("Поиск pdf-файлов отменен");
+                    cancellation.ThrowIfCancellationRequested();
+                }
+                _log.Trace($"Анализ файла {file}");
+                _fileCount++;
+                _percent += _deltaPercent;
+                ReportProgress(progress);
+                _log.Trace($"Прогресс {_percent}, дельта {_deltaPercent}");
+                if (file is null)
+                {
+                    _log.Error($"Файл {file} не существует");
+                    continue;
+                }
+                var fileName = Path.GetFileName(file);
+                if (fileName.StartsWith("~"))
+                {
+                    _log.Warn($"Файл {file} является временным файлом и будет игнорирован");
+                    continue;
+                }
 
+                var name = Path.GetFileNameWithoutExtension(file);
+                if (searchedNames.Contains(name))
+                {
+                    _log.Debug($"Файл {file} содержит конфиденциальную информацию");
+                    _result.Add(file);
+                    continue;
+                }
+                else
+                {
+                    _log.Trace($"Файл {file} не содержит конфиденциальную информацию");
+                }
+
+            }
+            CompleteProgress(progress);
         }
-        CompleteProgress(progress);
-
-        return result.ToArray();
+        catch (OperationCanceledException ex) when (ex.CancellationToken == cancellation) 
+        {
+            _log.Warn(ex.Message);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex.Message);
+        }
     }
 
 
@@ -300,6 +332,8 @@ internal class ConfidentialSearcher
 
     private void DeltaPercentCalculate(IEnumerable<string> collection)
     {
+        Thread.CurrentThread.Priority = ThreadPriority.Highest;
+
         var count = collection.Count();
         if(count <= _fileCount)
         {

@@ -14,6 +14,7 @@ using System;
 using ConfidentialityDocSearcher.Service;
 using ConfidentialityDocSearcher.Infrastructure.Commands.Base;
 using ConfidentialityDocSearcher.Infrastructure.Helpers;
+using System.Threading;
 
 namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
 {
@@ -22,6 +23,7 @@ namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
         private readonly IAppConfig _appConfig;
         private readonly IUserDialogService _userDialogService;
         List<string> _confidentialFiles = new List<string>();
+        private CancellationTokenSource _processCancellation;
         /* ------------------------------------------------------------------------------------------------------------ */
         public MainWindowViewModel(IUserDialogService userDialogService)
         {
@@ -37,6 +39,7 @@ namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
             #region Commands
             BrowseCommand = new RelayCommand(OnBrowseCommandExecuted, CanBrowseCommandExecute);
             SearchCommand = new RelayCommand(OnSearchCommandExecuted, CanSearchCommandExecute);
+            CancelCommand = new RelayCommand(OnCancelCommandExecuted, CanCancelCommandExecute);
             SaveCommand = new RelayCommand(OnSaveCommandExecuted, CanSaveCommandExecute);
             Exit = new RelayCommand(OnExitExecuted, CanExitExecute);
             #endregion
@@ -94,12 +97,26 @@ namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
             var progress = new Progress<double>(p => ProgressValue = p);
             var status = new Progress<string>(s => StatusText = s);
 
+            _processCancellation = new CancellationTokenSource();
+            var cancellation = _processCancellation.Token;
+
+
             ((Command)BrowseCommand).Executable = false;
             ((Command)SearchCommand).Executable = false;
             ((Command)SaveCommand).Executable = false;
 
-            _confidentialFiles = await searcher.SearchAsync(SearchPath, progress, status);
+            try
+            {
+                _confidentialFiles = await searcher.SearchAsync(SearchPath, progress, status, cancellation);
 
+            }
+            catch (OperationCanceledException ex) when (ex.CancellationToken == cancellation) { }
+            finally
+            {
+                _processCancellation.Dispose();
+                _processCancellation = null;
+            }
+            
             ((Command)BrowseCommand).Executable = true;
             ((Command)SearchCommand).Executable = true;
             ((Command)SaveCommand).Executable = true;
@@ -109,6 +126,22 @@ namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
         }
 
         private bool CanSearchCommandExecute(object p) => !string.IsNullOrEmpty(SearchPath);
+        #endregion
+
+        #region CancelCommand
+        public ICommand CancelCommand { get; }
+        private async void OnCancelCommandExecuted(object p)
+        {
+            _log.Debug("Команда отмены поиска конфиденциальных документов");
+            if(_processCancellation is null)
+            {
+                _log.Debug("Команда отмены поиска конфиденциальных документов не может быть выполнена, т.к. поиск не запущен");
+                return;
+            }
+            _processCancellation.Cancel();
+        }
+
+        private bool CanCancelCommandExecute(object p) => _processCancellation != null && !_processCancellation.IsCancellationRequested;
         #endregion
 
         #region SaveCommand
