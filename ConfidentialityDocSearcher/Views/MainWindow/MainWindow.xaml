@@ -22,9 +22,14 @@
                          IsReadOnly="True" Margin="0,0,10,0" />
             </DockPanel>
         </GroupBox>
-        <DockPanel Grid.Row="1" Margin="5">
-            <Button Content="Поиск" Command="{Binding Path=SearchCommand}" Padding="5" Width="100"/>
-        </DockPanel>
+        <UniformGrid Grid.Row="1" Margin="5" Rows="0">
+            <Button Content="Поиск" Command="{Binding Path=SearchCommand}"
+                    HorizontalAlignment="Right"
+                    Padding="5" Width="120" Margin="0,0,40,0"/>
+            <Button Content="Отмена" Command="{Binding Path=CancelCommand}"
+                    HorizontalAlignment="Left"
+                    Padding="5" Width="120" Margin="40,0,0,0"/>
+        </UniformGrid>
         <GroupBox Grid.Row="2" Header="Результат поиска" Margin="5">
             <DockPanel Margin="5">
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">

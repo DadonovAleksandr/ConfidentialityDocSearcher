@@ -11,7 +11,7 @@
             return _instance;
         }
 
-        public string AppName => "ProjectTemplate";
-        public string AppDesciption => "Шаблон проекта";
+        public string AppName => "ConfidentialityDocSearcher";
+        public string AppDesciption => "Поиск конфиденциальных документов";
     }
 }
