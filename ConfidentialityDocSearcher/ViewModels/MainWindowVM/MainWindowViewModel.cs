@@ -11,10 +11,10 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Input;
 using System;
-using ConfidentialityDocSearcher.Service;
 using ConfidentialityDocSearcher.Infrastructure.Commands.Base;
 using ConfidentialityDocSearcher.Infrastructure.Helpers;
 using System.Threading;
+using ConfidentialityDocSearcher.Service.Searcher;
 
 namespace ConfidentialityDocSearcher.ViewModels.MainWindowVm
 {

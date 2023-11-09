@@ -47,11 +47,25 @@
                            Margin="5,0"/>
             </StatusBarItem>
             <StatusBarItem HorizontalContentAlignment="Stretch">
-                <ProgressBar Value="{Binding Path=ProgressValue, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
-                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                     MinWidth="100" Height="20" Margin="10,0,5,0"/>    
+                <DockPanel>
+                    <DockPanel.Style>
+                        <Style TargetType="DockPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ProgressValue}" Value="0">
+                                    <Setter Property="Visibility" Value="Hidden"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ProgressValue}" Value="1">
+                                    <Setter Property="Visibility" Value="Hidden"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DockPanel.Style>
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding ProgressValue, StringFormat={}{0:P2}}" MinWidth="40" TextAlignment="Right"/>
+                    <ProgressBar Value="{Binding Path=ProgressValue, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Maximum="1"
+                                 MinWidth="100" Height="20" Margin="10,0,5,0"/>
+                </DockPanel>
             </StatusBarItem>
-            
         </StatusBar>
     </Grid>
 </Window>

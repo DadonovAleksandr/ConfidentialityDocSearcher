@@ -31,4 +31,8 @@
     </None>
   </ItemGroup>
 
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="&quot;$(SolutionDir)VersionChanger.exe&quot; $(ConfigurationName)" />
+  </Target>
+
 </Project>
